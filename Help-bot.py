@@ -17,14 +17,14 @@ except FileNotFoundError:
             "name": "Help-bot", 
             "invoker": "?", 
             "creator": "Friend Computer",
-            "git_link": "https://github.com/lngoralc/Help-bot",
-            "Topic_response": "WARN: You have mentioned a restricted topic. This has been logged.",
-            "CAS_response": "WARN: You have abused CAS. This has been logged.",
-            "Topic_alert": "",
-            "CAS_alert": "",
-            "bad_words": ["mutant", "treason", "commie", "communist"], 
-            "bad_word_exceptions": ["anti-"],
-            "alert_channel": ""
+            "gitLink": "https://github.com/lngoralc/Help-bot",
+            "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.",
+            "casResponse": "WARN: You have abused CAS. This has been logged.",
+            "topicAlert": "",
+            "casAlert": "",
+            "wordBlacklist": ["mutant", "treason", "commie", "communist"], 
+            "wordWhitelist": ["anti-"],
+            "alertChannel": ""
         }, f, indent = 4, ensure_ascii = False)
         sys.exit("config file created. "
             "Please make any modifications needed to the config.json file and restart the bot.");
@@ -80,7 +80,7 @@ async def on_ready():
         
     print("Authorization code:   " + str(client.user.id))
     
-    alertChannel = discord.utils.get(server.text_channels, name=config['alert_channel'])
+    alertChannel = discord.utils.get(server.text_channels, name=config['alertChannel'])
     if alertChannel != None:
         print("ALERT comm line:      " + str(alertChannel.id))
     else:
@@ -112,13 +112,13 @@ async def on_message(msg: discord.Message):
         
         
     # Topic monitoring
-    if any([badword in contentLower for badword in config['bad_words']]):
+    if any([badword in contentLower for badword in config['wordBlacklist']]):
         for word in contentLower.split():
             try:
-                for goodword in config['bad_word_exceptions']:
+                for goodword in config['wordWhitelist']:
                     if goodword in word:
                         raise Exception()
-                for badword in config['bad_words']:
+                for badword in config['wordBlacklist']:
                     if badword in word:
                         badwordCount = badwordCount + 1
                         raise Exception()
@@ -128,10 +128,10 @@ async def on_message(msg: discord.Message):
         if badwordCount > 0:
             # Warn the author of their infraction - substitutions must match response in config
             await msg.channel.send("{}\n{}".format(
-                author.mention, config['Topic_response']
+                author.mention, config['topicResponse']
             ))
             # Alert the Computer of the infraction - substitutions must match response in config
-            await alertChannel.send(config['Topic_alert'].format(
+            await alertChannel.send(config['topicAlert'].format(
                 Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
             ))
     # End topic monitoring
@@ -152,10 +152,10 @@ async def on_message(msg: discord.Message):
         if highestCASPos > authorClearance.position + 1:
             # Warn the author of their infraction - substitutions must match response in config
             await msg.channel.send("{}\n{}".format(
-                author.mention, config['CAS_response']
+                author.mention, config['casResponse']
             ))
             # Alert the Computer of the infraction - substitutions must match response in config
-            await alertChannel.send(config['CAS_alert'].format(
+            await alertChannel.send(config['casAlert'].format(
                 Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, highestCAS
             ))
     # End CAS-abuse monitoring

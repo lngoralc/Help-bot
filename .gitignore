@@ -123,4 +123,4 @@ dmypy.json
 .pyre/
 
 # Server-specific config files
-config
+config/
