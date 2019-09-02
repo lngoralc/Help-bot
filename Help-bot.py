@@ -126,7 +126,7 @@ async def on_message(msg: discord.Message):
                 continue
         
         if badwordCount > 0:
-            # Warn the author of their infraction - substitutions must match response in config
+            # Warn the author of their infraction
             await msg.channel.send("{}\n{}".format(
                 author.mention, config['topicResponse']
             ))
@@ -150,7 +150,7 @@ async def on_message(msg: discord.Message):
     if highestCAS != None:
         # Alert if the mentioned clearance was more than 1 level above the author's
         if highestCASPos > authorClearance.position + 1:
-            # Warn the author of their infraction - substitutions must match response in config
+            # Warn the author of their infraction
             await msg.channel.send("{}\n{}".format(
                 author.mention, config['casResponse']
             ))
