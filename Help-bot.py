@@ -196,7 +196,6 @@ if __name__ == '__main__':
         print("Shutting down gracefully...")
     except Exception as e:
         print(e)
-    finally:
 #    finally:
 #        shutdown()
 #        sys.exit()
