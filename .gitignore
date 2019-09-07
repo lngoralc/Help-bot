@@ -124,3 +124,6 @@ dmypy.json
 
 # Server-specific config files
 config/
+
+# Server-specific data
+data/

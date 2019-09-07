@@ -110,60 +110,84 @@ async def on_message(msg: discord.Message):
     if author.bot:
         return
         
+    # if a command is invoked by an admin
+    elif content.startswith(config['invoker']) and author.guild_permissions.administrator:
+        content = content[len(config['invoker']):].strip()
+        args = content.split(" ")
+        command = args[0]
+        args.remove(args[0])
         
-    # Topic monitoring
-    if any([badword in contentLower for badword in config['wordBlacklist']]):
-        for word in contentLower.split():
-            try:
-                for goodword in config['wordWhitelist']:
-                    if goodword in word:
-                        raise Exception()
-                for badword in config['wordBlacklist']:
-                    if badword in word:
-                        badwordCount = badwordCount + 1
-                        raise Exception()
-            except:
-                continue
+        if command == "infractions":
+            return
+            
+        if command == "shutdown":
+            await shutdown()
+            return
+    
+    # otherwise, scan message content for infractions
+    else:
+        # Topic monitoring
+        # TODO: overhaul with for badword in conf if content.includes(badword)
+        # TODO: still need to whitelist words though - use content.includes for strings of 2+ words, and existing code for single words?
+        if any([badword in contentLower for badword in config['wordBlacklist']]):
+            prevWord = None
+            for word in contentLower.split():
+                try:
+                    for goodword in config['wordWhitelist']:
+                        if goodword in word:
+                            raise Exception()
+                    for badword in config['wordBlacklist']:
+                        if badword in word or (badword in prevWord+" "+word):
+                            badwordCount = badwordCount + 1
+                            raise Exception()
+                except:
+                    continue
+                finally:
+                    prevWord = word
+            
+            if badwordCount > 0:
+                # Warn the author of their infraction
+                await msg.channel.send("{}\n{}".format(
+                    author.mention, config['topicResponse']
+                ))
+                # Alert the Computer of the infraction - substitutions must match response in config
+                await alertChannel.send(config['topicAlert'].format(
+                    Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
+                ))
+        # End topic monitoring
         
-        if badwordCount > 0:
-            # Warn the author of their infraction
-            await msg.channel.send("{}\n{}".format(
-                author.mention, config['topicResponse']
-            ))
-            # Alert the Computer of the infraction - substitutions must match response in config
-            await alertChannel.send(config['topicAlert'].format(
-                Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
-            ))
-    # End topic monitoring
-    
-    
-    # CAS-abuse monitoring
-    highestCAS = None
-    highestCASPos = 0
-    
-    # Find the highest mentioned clearance level
-    for mention in msg.role_mentions:
-        if mention.position > highestCASPos:
-            highestCAS = mention
-            highestCASPos = mention.position
-    
-    if highestCAS != None:
-        # Alert if the mentioned clearance was more than 1 level above the author's
-        if highestCASPos > authorClearance.position + 1:
-            # Warn the author of their infraction
-            await msg.channel.send("{}\n{}".format(
-                author.mention, config['casResponse']
-            ))
-            # Alert the Computer of the infraction - substitutions must match response in config
-            await alertChannel.send(config['casAlert'].format(
-                Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, highestCAS
-            ))
-    # End CAS-abuse monitoring
+        
+        # CAS-abuse monitoring
+        highestCAS = None
+        highestCASPos = 0
+        
+        # Find the highest mentioned clearance level
+        for mention in msg.role_mentions:
+            if mention.position > highestCASPos:
+                highestCAS = mention
+                highestCASPos = mention.position
+        
+        if highestCAS != None:
+            # Alert if the mentioned clearance was more than 1 level above the author's
+            if highestCASPos > authorClearance.position + 1:
+                # Warn the author of their infraction
+                await msg.channel.send("{}\n{}".format(
+                    author.mention, config['casResponse']
+                ))
+                # Alert the Computer of the infraction - substitutions must match response in config
+                await alertChannel.send(config['casAlert'].format(
+                    Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, highestCAS
+                ))
+        # End CAS-abuse monitoring
         
 
 def run_client(client, token):
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run(token))
+    
+async def shutdown():
+    await client.close()
+    await sys.exit()
     
 if __name__ == '__main__':
     try:
@@ -173,5 +197,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
     finally:
-        client.close()
+#    finally:
+#        shutdown()
 #        sys.exit()
