@@ -7,10 +7,10 @@ import asyncio  # Testing proper Ctrl-C handling, needed for now
 
 # Generate config
 try:
-    with open('config/config.json', encoding='utf8') as f:                                                             
-        config = json.load(f)
+    with open('config/config.json', encoding='utf8') as confFile:                                                             
+        config = json.load(confFile)
 except FileNotFoundError:
-    with open('config/config.json', 'w', encoding='utf8') as f:
+    with open('config/config.json', 'w', encoding='utf8') as confFile:
         config = {}
         json.dump({
             "description": "Serve Friend Computer!",
@@ -25,16 +25,16 @@ except FileNotFoundError:
             "wordBlacklist": ["mutant", "treason", "commie", "communist"], 
             "wordWhitelist": ["anti-"],
             "alertChannel": ""
-        }, f, indent = 4, ensure_ascii = False)
+        }, confFile, indent = 4, ensure_ascii = False)
         sys.exit("config file created. "
             "Please make any modifications needed to the config.json file and restart the bot.");
 
 try:
-    with open('config/user-info.json', encoding='utf8') as f:
-        userInfo = json.load(f)
+    with open('config/user-info.json', encoding='utf8') as confFile:
+        userInfo = json.load(confFile)
         generalInfo = userInfo['generalInfo']
 except FileNotFoundError:
-    with open('config/user-info.json', 'w', encoding='utf8') as f:
+    with open('config/user-info.json', 'w', encoding='utf8') as confFile:
         userInfo = {}
         json.dump({
             "generalInfo":{
@@ -44,7 +44,7 @@ except FileNotFoundError:
                 "clientSecret": ""
             },
             "serverID": ""
-        }, f, indent = 4, ensure_ascii = False)
+        }, confFile, indent = 4, ensure_ascii = False)
         sys.exit("user info file created. "
             "Please fill out the user-info.json file and restart the bot.");
 
@@ -129,6 +129,37 @@ async def on_message(msg: discord.Message):
         # Topic monitoring
         # TODO: overhaul with for badword in conf if content.includes(badword)
         # TODO: still need to whitelist words though - use content.includes for strings of 2+ words, and existing code for single words?
+        #if any([content.includes(badphrase) for badphrase in config['wordBlacklist']]):
+            #badphraseCount = 1 # defaults to 1 in case of multi-word strings
+            #badwordCount = 0 # defaults 0
+            #for word in contentLower.split():
+                #for badword in config['wordBlacklist']:
+                    #if badword in word:
+                        #badwordCount = badwordCount + 1
+                        #for goodword in config['wordWhitelist']:
+                            #if goodword in word:
+                                #badwordCount = badwordCount - 1
+                                #break # Stop checking whitelist
+                        #break # Stop checking blacklist against this word; continue checking words in message
+            
+            ## will catch bad phrases if no bad words, but if there's bad words and phrases, we don't know the infraction count
+            ## (only enters the IF if there's a bad phrase/word, but if there's bad words we don't know how many bad phrases there are)
+            #if badwordCount == 0:
+                #badphraseCount = 1
+            #else:
+                #badphraseCount = badwordCount
+                
+            #if badphraseCount > 0:
+                ## Warn the author of their infraction
+                #await msg.channel.send("{}\n{}".format(
+                    #author.mention, config['topicResponse']
+                #))
+                ## Alert the Computer of the infraction - substitutions must match response in config
+                #await alertChannel.send(config['topicAlert'].format(
+                    #Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
+                #))
+
+               
         if any([badword in contentLower for badword in config['wordBlacklist']]):
             prevWord = None
             for word in contentLower.split():
@@ -137,7 +168,8 @@ async def on_message(msg: discord.Message):
                         if goodword in word:
                             raise Exception()
                     for badword in config['wordBlacklist']:
-                        if badword in word or (badword in prevWord+" "+word):
+                        # if short blacklisted word, check if content exactly equal; otherwise check if content contains
+                        if (len(badword) < 4 and badword == word) or (len(badword) >= 4 and (badword in word or (badword in prevWord+" "+word))):
                             badwordCount = badwordCount + 1
                             raise Exception()
                 except:
