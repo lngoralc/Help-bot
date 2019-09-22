@@ -103,7 +103,7 @@ async def on_message(msg: discord.Message):
     content = msg.content
     contentLower = content.lower()
     author = msg.author
-    authorClearance = author.roles[-1]
+    authorClearance = author.top_role
     badwordCount = 0
     
     # Do not trigger on bots
