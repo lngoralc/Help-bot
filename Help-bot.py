@@ -112,7 +112,7 @@ async def on_message(msg: discord.Message):
     # if a command is invoked by an admin
     elif content.startswith(config['invoker']) and author.guild_permissions.administrator:
         content = content[len(config['invoker']):].strip()
-        args = content.split(" ")
+        args = content.split(' ')
         command = args[0]
         args.remove(args[0])
         
@@ -121,6 +121,10 @@ async def on_message(msg: discord.Message):
             
         if command == "shutdown":
             await shutdown()
+            return
+        
+        if command == "updateLinks":
+            await updateLinks()
             return
     
     # otherwise, scan message content for infractions
@@ -195,6 +199,45 @@ def run_client(client, token):
 async def shutdown():
     await client.close()
     await sys.exit()
+    
+async def updateLinks():
+    oldCitizenLinks = server.text_channels
+    citizens = server.members
+    
+    DMCategory = None
+    privateCategory = None
+    for category in server.categories:
+        if category.name == config['DMChannels']:
+            DMCategory = category
+        elif category.name == config['privateChannels']:
+            privateCategory = category
+    
+    for link in oldCitizenLinks:
+        if link.category == DMCategory or link.category == privateCategory:
+            await link.delete()
+            
+    for i in range(len(citizens)):
+        if citizens[i].bot or Computer in citizens[i].roles:
+            continue
+        
+        for j in range(i+1, len(citizens)):
+            if citizens[j].bot or Computer in citizens[j].roles:
+                continue
+            
+            privatePermissions = {
+                server.default_role: discord.PermissionOverwrite(read_messages=False),
+                citizens[i]: discord.PermissionOverwrite(read_messages=True),
+                citizens[j]: discord.PermissionOverwrite(read_messages=True)
+            }
+            await server.create_text_channel(citizens[i].display_name+'-'+citizens[j].display_name, overwrites=privatePermissions, category=privateCategory)
+            
+        DMPermissions = {
+            server.default_role: discord.PermissionOverwrite(read_messages=False),
+            citizens[i]: discord.PermissionOverwrite(read_messages=True)
+        }
+        await server.create_text_channel('gm-'+citizens[i].display_name, overwrites=DMPermissions, category=DMCategory)
+        
+    return
     
 if __name__ == '__main__':
     try:
