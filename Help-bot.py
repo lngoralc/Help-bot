@@ -227,18 +227,20 @@ async def updateLinks():
             privatePermissions = {
                 server.default_role: discord.PermissionOverwrite(read_messages=False),
                 citizens[i]: discord.PermissionOverwrite(read_messages=True),
-                citizens[j]: discord.PermissionOverwrite(read_messages=True)
+                citizens[j]: discord.PermissionOverwrite(read_messages=True),
+                server.me: discord.PermissionOverwrite(read_messages=True)
             }
             await server.create_text_channel(citizens[i].display_name+'-'+citizens[j].display_name, overwrites=privatePermissions, category=privateCategory)
             
         DMPermissions = {
             server.default_role: discord.PermissionOverwrite(read_messages=False),
-            citizens[i]: discord.PermissionOverwrite(read_messages=True)
+            citizens[i]: discord.PermissionOverwrite(read_messages=True),
+            server.me: discord.PermissionOverwrite(read_messages=True)
         }
         await server.create_text_channel('gm-'+citizens[i].display_name, overwrites=DMPermissions, category=DMCategory)
         
     return
-    
+
 if __name__ == '__main__':
     try:
         run_client(client, generalInfo['discordToken'])
