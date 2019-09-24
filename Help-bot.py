@@ -17,11 +17,12 @@ except FileNotFoundError:
     with open('config/config.json', 'w', encoding='utf8') as confFile:
         config = {}
         json.dump({
-            "description": "Serve Friend Computer!",
             "name": "Help-bot",
+            "description": "Serve Friend Computer!",
             "invoker": "$",
             "creator": "Friend Computer",
             "gitLink": "https://github.com/lngoralc/Help-bot",
+            "maxMsgLength": 0,
             "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.",
             "casResponse": "WARN: You have abused CAS. This has been logged.",
             "topicAlert": "",
@@ -57,6 +58,7 @@ except FileNotFoundError:
             "Please fill out the user-info.json file and restart the bot.");
 
 desc = config['description']
+maxMsgLength = config['maxMsgLength']
 client = discord.Client(description=desc, max_messages=100)
 server = None
 alertChannel = None
@@ -149,8 +151,15 @@ async def on_message(msg: discord.Message):
     
     # otherwise, scan message content for infractions
     else:
+        # Discord char limit is 2000, but the topic alert message contains ~240 characters not including the triggering message
+        # Thus a 1900 char message with a restricted topic mentioned will result in a ~2140 char topic alert message, which can't be sent
+        # Therefore enforcing a custom max message size - ignore any characters in the message above this limit for the sake of triggering alerts
+        if len(content) > maxMsgLength:
+            content = content[:maxMsgLength]
+            contentLower = contentLower[:maxMsgLength]
+        
         # Topic monitoring
-        if any([badword in contentLower for badword in config['wordBlacklist']]):
+        if not ComputerRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
             prevWord = ''
             badwordCount = 0
             
