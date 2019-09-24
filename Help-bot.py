@@ -22,6 +22,8 @@ except FileNotFoundError:
             "invoker": "$",
             "creator": "Friend Computer",
             "gitLink": "https://github.com/lngoralc/Help-bot",
+            "computerRole": "",
+            "computerUser": "",
             "maxMsgLength": 0,
             "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.",
             "casResponse": "WARN: You have abused CAS. This has been logged.",
@@ -109,8 +111,8 @@ async def on_ready():
         return    
         
     print("\nLinking to the Computer...")
-    ComputerRole = discord.utils.get(server.roles, name="Computer")
-    Computer = discord.utils.get(server.members, display_name="Friend Computer")
+    ComputerRole = discord.utils.get(server.roles, name=config['computerRole'])
+    Computer = discord.utils.get(server.members, display_name=config['computerUser'])
     if ComputerRole != None and Computer != None:
         print("Activated link to Computer.")
     else:
@@ -153,12 +155,12 @@ async def on_message(msg: discord.Message):
     else:
         # Discord char limit is 2000, but the topic alert message contains ~240 characters not including the triggering message
         # Thus a 1900 char message with a restricted topic mentioned will result in a ~2140 char topic alert message, which can't be sent
-        # Therefore enforcing a custom max message size - ignore any characters in the message above this limit for the sake of triggering alerts
+        # Therefore enforcing a custom max message size - ignore any characters in the message above this limit when scanning for restricted topics or sending alerts
         if len(content) > maxMsgLength:
             content = content[:maxMsgLength]
             contentLower = contentLower[:maxMsgLength]
         
-        # Topic monitoring
+        # Topic monitoring - don't monitor the Computer
         if not ComputerRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
             prevWord = ''
             badwordCount = 0
