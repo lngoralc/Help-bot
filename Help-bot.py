@@ -5,6 +5,10 @@ from datetime import datetime
 import sys
 import asyncio  # Testing proper Ctrl-C handling, needed for now
 
+# Define custom exception: CASViolation
+class CASViolation(Exception):
+    pass
+
 # Generate config
 try:
     with open('config/config.json', encoding='utf8') as confFile:                                                             
@@ -57,6 +61,7 @@ client = discord.Client(description=desc, max_messages=100)
 server = None
 alertChannel = None
 PAChannel = None
+ComputerRole = None
 Computer = None
 
 @client.event
@@ -65,6 +70,7 @@ async def on_ready():
     global server
     global alertChannel
     global PAChannel
+    global ComputerRole
     global Computer
     print("Model:                " + client.user.name)
     print("Number:               " + client.user.discriminator)
@@ -101,8 +107,9 @@ async def on_ready():
         return    
         
     print("\nLinking to the Computer...")
-    Computer = discord.utils.get(server.roles, name="Computer")
-    if Computer != None:
+    ComputerRole = discord.utils.get(server.roles, name="Computer")
+    Computer = discord.utils.get(server.members, display_name="Friend Computer")
+    if ComputerRole != None and Computer != None:
         print("Activated link to Computer.")
     else:
         print("\nWARN: Could not activate link to Computer.\n")
@@ -172,7 +179,7 @@ async def on_message(msg: discord.Message):
                 ))
                 # Alert the Computer of the infraction - substitutions must match response in config
                 await alertChannel.send(config['topicAlert'].format(
-                    Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
+                    ComputerRole.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
                 ))
             else:
                 await alertChannel.send(config['topicWarn'].format(
@@ -182,26 +189,34 @@ async def on_message(msg: discord.Message):
         
         
         # CAS-abuse monitoring
-        highestCAS = None
-        highestCASPos = 0
-        
-        # Find the highest mentioned clearance level
-        for mention in msg.role_mentions:
-            if mention.position > highestCASPos:
-                highestCAS = mention
-                highestCASPos = mention.position
-        
-        if highestCAS != None:
+        try:
+            highestCAS = None
+            highestCASPos = 0
+            
+            # Alert if clearance less than Ultraviolet directly mentions the Computer
+            if Computer in msg.mentions and authorClearance.position < 11: 
+                highestCAS = 'Friend Computer'
+                raise CASViolation()
+                
+            # Find the highest mentioned clearance level
+            for mention in msg.role_mentions:
+                if mention.position > highestCASPos:
+                    highestCAS = mention
+                    highestCASPos = mention.position
+                    
             # Alert if the mentioned clearance was more than 1 level above the author's
-            if highestCASPos > authorClearance.position + 1:
-                # Warn the author of their infraction
-                await msg.channel.send("{}\n{}".format(
-                    author.mention, config['casResponse']
-                ))
-                # Alert the Computer of the infraction - substitutions must match response in config
-                await alertChannel.send(config['casAlert'].format(
-                    Computer.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, highestCAS
-                ))
+            if highestCAS != None and highestCASPos > authorClearance.position + 1:
+                raise CASViolation()
+            
+        except CASViolation:
+            # Warn the author of their infraction
+            await msg.channel.send("{}\n{}".format(
+                author.mention, config['casResponse']
+            ))
+            # Alert the Computer of the infraction - substitutions must match response in config
+            await alertChannel.send(config['casAlert'].format(
+                ComputerRole.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, highestCAS
+            ))
         # End CAS-abuse monitoring
         
 
@@ -230,11 +245,11 @@ async def updateLinks():
             await link.delete()
             
     for i in range(len(citizens)):
-        if citizens[i].bot or Computer in citizens[i].roles:
+        if citizens[i].bot or ComputerRole in citizens[i].roles:
             continue
         
         for j in range(i+1, len(citizens)):
-            if citizens[j].bot or Computer in citizens[j].roles:
+            if citizens[j].bot or ComputerRole in citizens[j].roles:
                 continue
             
             privatePermissions = {
