@@ -14,17 +14,21 @@ except FileNotFoundError:
         config = {}
         json.dump({
             "description": "Serve Friend Computer!",
-            "name": "Help-bot", 
-            "invoker": "?", 
+            "name": "Help-bot",
+            "invoker": "$",
             "creator": "Friend Computer",
             "gitLink": "https://github.com/lngoralc/Help-bot",
             "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.",
             "casResponse": "WARN: You have abused CAS. This has been logged.",
             "topicAlert": "",
+            "topicWarn": "",
             "casAlert": "",
-            "wordBlacklist": ["mutant", "treason", "commie", "communist"], 
+            "wordBlacklist": ["mutant", "treason", "commie", "communist"],
             "wordWhitelist": ["anti-"],
-            "alertChannel": ""
+            "alertChannel": "",
+            "PAChannel": "",
+            "DMChannels": "",
+            "privateChannels": ""
         }, confFile, indent = 4, ensure_ascii = False)
         sys.exit("config file created. "
             "Please make any modifications needed to the config.json file and restart the bot.");
@@ -52,6 +56,7 @@ desc = config['description']
 client = discord.Client(description=desc, max_messages=100)
 server = None
 alertChannel = None
+PAChannel = None
 Computer = None
 
 @client.event
@@ -59,6 +64,7 @@ async def on_ready():
     print("\nInitializing...\n")
     global server
     global alertChannel
+    global PAChannel
     global Computer
     print("Model:                " + client.user.name)
     print("Number:               " + client.user.discriminator)
@@ -82,10 +88,17 @@ async def on_ready():
     
     alertChannel = discord.utils.get(server.text_channels, name=config['alertChannel'])
     if alertChannel != None:
-        print("ALERT comm line:      " + str(alertChannel.id))
+        print("PA comm line:         " + str(alertChannel.id))
+    else:
+        print("\nERROR: Could not get public announcement line!\n")
+        return
+    
+    PAChannel = discord.utils.get(server.text_channels, name=config['PAChannel'])
+    if PAChannel != None:
+        print("ALERT comm line:      " + str(PAChannel.id))
     else:
         print("\nERROR: Could not get ALERT comm line!\n")
-        return
+        return    
         
     print("\nLinking to the Computer...")
     Computer = discord.utils.get(server.roles, name="Computer")
