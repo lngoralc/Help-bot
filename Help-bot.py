@@ -98,16 +98,16 @@ async def on_ready():
     
     alertChannel = discord.utils.get(server.text_channels, name=config['alertChannel'])
     if alertChannel != None:
-        print("PA comm line:         " + str(alertChannel.id))
+        print("Alert comm line:      " + str(alertChannel.id))
     else:
-        print("\nERROR: Could not get public announcement line!\n")
+        print("\nERROR: Could not get alert comm line!\n")
         return
     
     PAChannel = discord.utils.get(server.text_channels, name=config['PAChannel'])
     if PAChannel != None:
-        print("ALERT comm line:      " + str(PAChannel.id))
+        print("PA comm line:         " + str(PAChannel.id))
     else:
-        print("\nERROR: Could not get ALERT comm line!\n")
+        print("\nERROR: Could not get public announcement line!\n")
         return    
         
     print("\nLinking to the Computer...")
