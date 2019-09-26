@@ -11,7 +11,7 @@ class CASViolation(Exception):
 
 # Generate config
 try:
-    with open('config/config.json', encoding='utf8') as confFile:                                                             
+    with open('config/config.json', encoding='utf8') as confFile:
         config = json.load(confFile)
 except FileNotFoundError:
     with open('config/config.json', 'w', encoding='utf8') as confFile:
@@ -177,7 +177,7 @@ async def on_message(msg: discord.Message):
                             raise Exception()
                         elif badword in word or (' ' in badword and badword in prevWord+" "+word):
                             badwordCount += 1
-                            raise Exception()                            
+                            raise Exception()
                 except:
                     continue
                 finally:
@@ -206,7 +206,7 @@ async def on_message(msg: discord.Message):
             
             # Alert if clearance less than Ultraviolet directly mentions the Computer
             if Computer in msg.mentions and authorClearance.position < 11: 
-                highestCAS = 'Friend Computer'
+                highestCAS = Computer.display_name
                 raise CASViolation()
                 
             # Find the highest mentioned clearance level
