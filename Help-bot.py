@@ -59,9 +59,8 @@ except FileNotFoundError:
         sys.exit("user info file created. "
             "Please fill out the user-info.json file and restart the bot.");
 
-desc = config['description']
 maxMsgLength = config['maxMsgLength']
-client = discord.Client(description=desc, max_messages=100)
+client = discord.Client(description=config['description'], max_messages=100)
 server = None
 alertChannel = None
 PAChannel = None
@@ -240,6 +239,9 @@ async def shutdown():
 async def updateLinks():
     oldCitizenLinks = server.text_channels
     citizens = server.members
+
+    # Sort alphabetically by display name
+    citizens.sort(key=lambda x: x.display_name)
     
     DMCategory = None
     privateCategory = None
@@ -274,7 +276,7 @@ async def updateLinks():
             citizens[i]: discord.PermissionOverwrite(read_messages=True),
             server.me: discord.PermissionOverwrite(read_messages=True)
         }
-        await server.create_text_channel('gm-'+citizens[i].display_name, overwrites=DMPermissions, category=DMCategory)
+        await server.create_text_channel('computer-'+citizens[i].display_name, overwrites=DMPermissions, category=DMCategory)
         
     return
 
