@@ -107,7 +107,7 @@ async def on_ready():
         print("PA comm line:         " + str(PAChannel.id))
     else:
         print("\nERROR: Could not get public announcement line!\n")
-        return    
+        return
         
     print("\nLinking to the Computer...")
     ComputerRole = discord.utils.get(server.roles, name=config['computerRole'])
@@ -202,7 +202,7 @@ async def on_message(msg: discord.Message):
             highestCASPos = 0
             
             # Alert if clearance less than Ultraviolet directly mentions the Computer
-            if Computer in msg.mentions and authorClearance.position < 11: 
+            if Computer in msg.mentions and authorClearance.position < 11:
                 highestCAS = Computer.display_name
                 raise CASViolation()
                 
