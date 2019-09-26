@@ -125,6 +125,11 @@ async def on_ready():
 @client.event
 async def on_message(msg: discord.Message):
     content = msg.content
+    # Discord char limit is 2000, but the topic alert message adds ~240 characters to a triggering message
+    # Therefore ignoring any characters in the message above a configured limit
+    if len(content) > maxMsgLength:
+        content = content[:maxMsgLength]
+
     contentLower = content.lower()
     author = msg.author
     authorClearance = author.top_role
@@ -153,13 +158,6 @@ async def on_message(msg: discord.Message):
     
     # otherwise, scan message content for infractions
     else:
-        # Discord char limit is 2000, but the topic alert message contains ~240 characters not including the triggering message
-        # Thus a 1900 char message with a restricted topic mentioned will result in a ~2140 char topic alert message, which can't be sent
-        # Therefore enforcing a custom max message size - ignore any characters in the message above this limit when scanning for restricted topics or sending alerts
-        if len(content) > maxMsgLength:
-            content = content[:maxMsgLength]
-            contentLower = contentLower[:maxMsgLength]
-        
         # Topic monitoring - don't monitor the Computer
         if not ComputerRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
             prevWord = ''
