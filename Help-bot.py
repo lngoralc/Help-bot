@@ -180,10 +180,10 @@ async def on_message(msg: discord.Message):
                                 blacklistCount += 1
                                 raise Exception()
                         # if short blacklisted word, check if content exactly equal; otherwise check if content contains
-                        elif len(blacklisted) < 4 and blacklisted == word:
+                        elif len(blacklisted) < 5 and blacklisted == word:
                             blacklistCount += 1
                             raise Exception()
-                        elif blacklisted in word:
+                        elif len(blacklisted) >= 5 and blacklisted in word:
                             blacklistCount += 1
                             raise Exception()
                 except:
