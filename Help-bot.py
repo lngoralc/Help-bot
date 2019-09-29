@@ -140,7 +140,7 @@ async def on_message(msg: discord.Message):
     # if a command is invoked by an admin
     elif content.startswith(config['invoker']) and author.guild_permissions.administrator:
         content = content[len(config['invoker']):].strip()
-        args = content.split(' ')
+        args = content.split()
         command = args[0]
         args.remove(args[0])
         
@@ -159,35 +159,44 @@ async def on_message(msg: discord.Message):
     else:
         # Topic monitoring - don't monitor the Computer
         if not ComputerRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
-            prevWord = ''
-            badwordCount = 0
+            blacklistCount = 0
             
-            for word in contentLower.split():
+            words = contentLower.split()
+            for i in range(len(words)):
+                word = words[i]
                 try:
-                    for goodword in config['wordWhitelist']:
-                        if goodword in word:
+                    for whitelisted in config['wordWhitelist']:
+                        if whitelisted in word:
                             raise Exception()
-                    for badword in config['wordBlacklist']:
+                    for blacklisted in config['wordBlacklist']:
+                        badWords = blacklisted.split()
+                        if len(badWords) > 1:
+                            badPhrase = True
+                            for j in range(len(badWords)):
+                                if badWords[j] not in words[i+j]:
+                                    badPhrase = False
+                                    break
+                            if badPhrase:
+                                blacklistCount += 1
+                                raise Exception()
                         # if short blacklisted word, check if content exactly equal; otherwise check if content contains
-                        if len(badword) < 4 and badword == word:
-                            badwordCount += 1
+                        elif len(blacklisted) < 4 and blacklisted == word:
+                            blacklistCount += 1
                             raise Exception()
-                        elif badword in word or (' ' in badword and badword in prevWord+" "+word):
-                            badwordCount += 1
+                        elif blacklisted in word:
+                            blacklistCount += 1
                             raise Exception()
                 except:
                     continue
-                finally:
-                    prevWord = word
             
-            if badwordCount > 0:
+            if blacklistCount > 0:
                 # Warn the author of their infraction
                 await msg.channel.send("{}\n{}".format(
                     author.mention, config['topicResponse']
                 ))
                 # Alert the Computer of the infraction - substitutions must match response in config
                 await alertChannel.send(config['topicAlert'].format(
-                    ComputerRole.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, badwordCount, content
+                    ComputerRole.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, blacklistCount, content
                 ))
             else:
                 await alertChannel.send(config['topicWarn'].format(
