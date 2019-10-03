@@ -5,7 +5,10 @@ from datetime import datetime
 import sys
 import asyncio  # Testing proper Ctrl-C handling, needed for now
 
-# Define custom exception: CASViolation
+# Define custom exceptions: XlistedWord, CASViolation
+class XlistedWord(Exception):
+    pass
+
 class CASViolation(Exception):
     pass
 
@@ -167,7 +170,7 @@ async def on_message(msg: discord.Message):
                 try:
                     for whitelisted in config['wordWhitelist']:
                         if whitelisted in word:
-                            raise Exception()
+                            raise XlistedWord()
                     for blacklisted in config['wordBlacklist']:
                         badWords = blacklisted.split()
                         if len(badWords) > 1:
@@ -178,15 +181,15 @@ async def on_message(msg: discord.Message):
                                     break
                             if badPhrase:
                                 blacklistCount += 1
-                                raise Exception()
+                                raise XlistedWord()
                         # if short blacklisted word, check if content exactly equal; otherwise check if content contains
                         elif len(blacklisted) < 5 and blacklisted == word:
                             blacklistCount += 1
-                            raise Exception()
+                            raise XlistedWord()
                         elif len(blacklisted) >= 5 and blacklisted in word:
                             blacklistCount += 1
-                            raise Exception()
-                except:
+                            raise XlistedWord()
+                except XlistedWord:
                     continue
             
             if blacklistCount > 0:
