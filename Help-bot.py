@@ -25,23 +25,23 @@ except FileNotFoundError:
             "invoker": "$",
             "creator": "Friend Computer",
             "gitLink": "https://github.com/lngoralc/Help-bot",
-            "computerRole": "",
-            "computerUser": "",
-            "maxMsgLength": 0,
-            "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.",
-            "casResponse": "WARN: You have abused CAS. This has been logged.",
-            "topicAlert": "",
-            "topicWarn": "",
-            "casAlert": "",
-            "wordBlacklist": ["mutant", "treason", "commie", "communist"],
-            "wordWhitelist": ["anti-"],
-            "alertChannel": "",
-            "PAChannel": "",
-            "DMChannels": "",
-            "privateChannels": ""
+            "computerRole": "Core System", # the role to assign to the person playing the Computer
+            "computerUser": "Friend Computer", # the nickname to assign to the person playing the Computer
+            "maxMsgLength": 0, # should be less than 2000 (discord char limit) minus the overhead of the longest alert/warn message below
+            "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.", # feedback to a bad citizen
+            "casResponse": "WARN: You have abused CAS. This has been logged.", # feedback to a bad citizen
+            "topicAlert": "{} ```\nALERT: Conversation flagged for review.\nTime:           {}\nChannel:        {}\nCitizen:        {}\nClearance:      {}\nInfractions:    {}\nMessage:        {} ```", # monitoring message to the Computer
+            "topicWarn": "```WARN: Possible mention of restricted topic in conversation.\nTime:           {}\nChannel:        {}\nCitizen:        {}\nMessage:        {} ```", # monitoring message to the Computer
+            "casAlert": "{} ```\nALERT: Citizen abused Clearance Alert System.\nTime:           {}\nChannel:        {}\nCitizen:        {}\nClearance:      {}\nCAS Level:      {} ```", # monitoring message to the Computer
+            "wordBlacklist": ["mutant", "treason", "commie", "communist"], # full or partial blacklisted words
+            "wordWhitelist": ["anti-"], # partial whitelisted words (overrides an otherwise-blacklisted word, if the whitelisted phrase is present)
+            "alertChannel": "monitoring", # name of the channel to send alerts to
+            "PAChannel": "announcements", # name of the channel to send announcements to
+            "DMChannels": "Computer Links", # name of the category for private citizen-computer comms
+            "privateChannels": "Private Links" # name of the category for private citizen-citizen comms
         }, confFile, indent = 4, ensure_ascii = False)
-        sys.exit("config file created. "
-            "Please make any modifications needed to the config.json file and restart the bot.");
+        sys.exit("Config file created. "
+            "Please make modifications as desired to the config.json file and restart the bot.");
 
 try:
     with open('config/user-info.json', encoding='utf8') as confFile:
@@ -127,8 +127,8 @@ async def on_ready():
 @client.event
 async def on_message(msg: discord.Message):
     content = msg.content
-    # Discord char limit is 2000, but the topic alert message adds ~240 characters to a triggering message
-    # Therefore ignoring any characters in the message above a configured limit
+    # Discord char limit is 2000, but the topic alert message length adds its base length to an up-to-2000-char triggering message
+    # Therefore ignoring any characters in the message above a configured limit (configure according to your alert message base length)
     if len(content) > maxMsgLength:
         content = content[:maxMsgLength]
 
@@ -136,12 +136,8 @@ async def on_message(msg: discord.Message):
     author = msg.author
     authorClearance = author.top_role
     
-    # Do not trigger on bots
-    if author.bot:
-        return
-        
-    # if a command is invoked by an admin
-    elif content.startswith(config['invoker']) and author.guild_permissions.administrator:
+    # Admin commands
+    if content.startswith(config['invoker']) and author.guild_permissions.administrator:
         content = content[len(config['invoker']):].strip()
         args = content.split()
         command = args[0]
@@ -158,7 +154,11 @@ async def on_message(msg: discord.Message):
             await updateLinks()
             return
     
-    # otherwise, scan message content for infractions
+    # Do not trigger on Alpha Complex infrastructure
+    elif author.bot or authorClearance == ComputerRole:
+        return
+        
+    # Scan message content for infractions
     else:
         # Topic monitoring - don't monitor the Computer
         if not ComputerRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
@@ -168,6 +168,7 @@ async def on_message(msg: discord.Message):
             for i in range(len(words)):
                 word = words[i]
                 try:
+                    # skip word if it contains whitelisted phrase
                     for whitelisted in config['wordWhitelist']:
                         if whitelisted in word:
                             raise XlistedWord()
@@ -202,6 +203,8 @@ async def on_message(msg: discord.Message):
                     ComputerRole.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, blacklistCount, content
                 ))
             else:
+                # Couldn't find an exact offender (possibly due to the whitelist), but a blacklisted phrase was in the message
+                # Silently send a private warn to the alert channel, instead of an alert + public warning
                 await alertChannel.send(config['topicWarn'].format(
                     datetime.now(), msg.channel.name, author.display_name, content
                 ))
@@ -214,7 +217,8 @@ async def on_message(msg: discord.Message):
             highestCASPos = 0
             
             # Alert if clearance less than Ultraviolet directly mentions the Computer
-            if Computer in msg.mentions and authorClearance.position < 11:
+            # (assumes there's no extra roles in the server hierarchy between UV and the Computer's role)
+            if Computer in msg.mentions and authorClearance.position < ComputerRole.position - 1:
                 highestCAS = Computer.display_name
                 raise CASViolation()
                 
@@ -263,10 +267,19 @@ async def updateLinks():
         elif category.name == config['privateChannels']:
             privateCategory = category
     
+    # Delete old channels
     for link in oldCitizenLinks:
         if link.category == DMCategory or link.category == privateCategory:
             await link.delete()
-            
+    
+    # Create public shared channel
+    PublicPermissions = {
+        server.default_role: discord.PermissionOverwrite(read_messages=True),
+        server.me: discord.PermissionOverwrite(read_messages=True)
+    }
+    await server.create_text_channel('computer-all', overwrites=PublicPermissions, category=DMCategory)
+    
+    # Create private channel for each citizen-citizen and citizen-Computer pair
     for i in range(len(citizens)):
         if citizens[i].bot or ComputerRole in citizens[i].roles:
             continue
@@ -299,6 +312,3 @@ if __name__ == '__main__':
         print("Shutting down gracefully...")
     except Exception as e:
         print(e)
-#    finally:
-#        shutdown()
-#        sys.exit()
