@@ -14,10 +14,10 @@ class CASViolation(Exception):
 
 # Generate config
 try:
-    with open('config/config.json', encoding='utf8') as confFile:
+    with open(sys.path[0]+'/config/config.json', encoding='utf8') as confFile:
         config = json.load(confFile)
 except FileNotFoundError:
-    with open('config/config.json', 'w', encoding='utf8') as confFile:
+    with open(sys.path[0]+'/config/config.json', 'w', encoding='utf8') as confFile:
         config = {}
         json.dump({
             "name": "Help-bot",
@@ -44,11 +44,11 @@ except FileNotFoundError:
             "Please make modifications as desired to the config.json file and restart the bot.");
 
 try:
-    with open('config/user-info.json', encoding='utf8') as confFile:
+    with open(sys.path[0]+'/config/user-info.json', encoding='utf8') as confFile:
         userInfo = json.load(confFile)
         generalInfo = userInfo['generalInfo']
 except FileNotFoundError:
-    with open('config/user-info.json', 'w', encoding='utf8') as confFile:
+    with open(sys.path[0]+'/config/user-info.json', 'w', encoding='utf8') as confFile:
         userInfo = {}
         json.dump({
             "generalInfo":{
@@ -136,8 +136,8 @@ async def on_message(msg: discord.Message):
     author = msg.author
     authorClearance = author.top_role
     
-    # Admin commands
-    if content.startswith(config['invoker']) and author.guild_permissions.administrator:
+    # Bot commands
+    if content.startswith(config['invoker']) and authorClearance.position > server.me.top_role.position:
         content = content[len(config['invoker']):].strip()
         args = content.split()
         command = args[0]
