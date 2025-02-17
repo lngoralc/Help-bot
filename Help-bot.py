@@ -1,8 +1,9 @@
+from datetime import datetime
 import discord
 import json
-import time
-from datetime import datetime
+from pathlib import Path
 import sys
+import time
 import asyncio  # Testing proper Ctrl-C handling, needed for now
 
 # Define custom exceptions: XlistedWord, CASViolation
@@ -17,6 +18,8 @@ try:
     with open(sys.path[0]+'/config/config.json', encoding='utf8') as confFile:
         config = json.load(confFile)
 except FileNotFoundError:
+    confFile = Path(sys.path[0]+'/config/config.json')
+    confFile.parent.mkdir(exist_ok=True, parents=True)
     with open(sys.path[0]+'/config/config.json', 'w', encoding='utf8') as confFile:
         config = {}
         json.dump({
@@ -27,6 +30,7 @@ except FileNotFoundError:
             "gitLink": "https://github.com/lngoralc/Help-bot",
             "computerRole": "Core System", # the role to assign to the person playing the Computer
             "computerUser": "Friend Computer", # the nickname to assign to the person playing the Computer
+            "inactiveRole": "Deactivated", # name of the role assigned to inactive server members (will be ignored when creating private text channels)
             "maxMsgLength": 0, # should be less than 2000 (discord char limit) minus the overhead of the longest alert/warn message below
             "topicResponse": "WARN: You have mentioned a restricted topic. This has been logged.", # feedback to a bad citizen
             "casResponse": "WARN: You have abused CAS. This has been logged.", # feedback to a bad citizen
@@ -48,6 +52,8 @@ try:
         userInfo = json.load(confFile)
         generalInfo = userInfo['generalInfo']
 except FileNotFoundError:
+    confFile = Path(sys.path[0]+'/config/user-info.json')
+    confFile.parent.mkdir(exist_ok=True, parents=True)
     with open(sys.path[0]+'/config/user-info.json', 'w', encoding='utf8') as confFile:
         userInfo = {}
         json.dump({
@@ -63,12 +69,13 @@ except FileNotFoundError:
             "Please fill out the user-info.json file and restart the bot.");
 
 maxMsgLength = config['maxMsgLength']
-client = discord.Client(description=config['description'], max_messages=100)
+client = discord.Client(description=config['description'], max_messages=100, intents=discord.Intents.all())
 server = None
 alertChannel = None
 PAChannel = None
 ComputerRole = None
 Computer = None
+
 
 @client.event
 async def on_ready():
@@ -78,9 +85,10 @@ async def on_ready():
     global PAChannel
     global ComputerRole
     global Computer
+    global InactiveRole
     print("Model:                " + client.user.name)
     print("Number:               " + client.user.discriminator)
-    
+
     serverID = userInfo['serverID']
     serverList = client.guilds
     print("Regions: ")
@@ -95,27 +103,28 @@ async def on_ready():
     else:
         print("\nERROR: Could not get server!\n")
         return
-        
+
     print("Authorization code:   " + str(client.user.id))
-    
+
     alertChannel = discord.utils.get(server.text_channels, name=config['alertChannel'])
     if alertChannel != None:
         print("Alert comm line:      " + str(alertChannel.id))
     else:
         print("\nERROR: Could not get alert comm line!\n")
         return
-    
+
     PAChannel = discord.utils.get(server.text_channels, name=config['PAChannel'])
     if PAChannel != None:
         print("PA comm line:         " + str(PAChannel.id))
     else:
         print("\nERROR: Could not get public announcement line!\n")
         return
-        
+
     print("\nLinking to the Computer...")
     ComputerRole = discord.utils.get(server.roles, name=config['computerRole'])
     Computer = discord.utils.get(server.members, display_name=config['computerUser'])
-    if ComputerRole != None and Computer != None:
+    InactiveRole = discord.utils.get(server.roles, name=config['inactiveRole'])
+    if ComputerRole != None and Computer != None and InactiveRole != None:
         print("Activated link to Computer.")
     else:
         print("\nWARN: Could not activate link to Computer.\n")
@@ -123,6 +132,7 @@ async def on_ready():
 
     print("\n........................................\n")
     print("Initialization complete. Ready to serve!\n")
+
 
 @client.event
 async def on_message(msg: discord.Message):
@@ -135,35 +145,35 @@ async def on_message(msg: discord.Message):
     contentLower = content.lower()
     author = msg.author
     authorClearance = author.top_role
-    
+
     # Bot commands
     if content.startswith(config['invoker']) and authorClearance.position > server.me.top_role.position:
         content = content[len(config['invoker']):].strip()
         args = content.split()
         command = args[0]
         args.remove(args[0])
-        
+
         if command == "infractions":
             return
-            
+
         if command == "shutdown":
             await shutdown()
             return
-        
+
         if command == "updateLinks":
             await updateLinks()
             return
-    
+
     # Do not trigger on Alpha Complex infrastructure
     elif author.bot or authorClearance == ComputerRole:
         return
-        
+
     # Scan message content for infractions
     else:
-        # Topic monitoring - don't monitor the Computer
-        if not ComputerRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
+        # Topic monitoring - don't monitor the Computer or inactive server members
+        if not ComputerRole in author.roles and not InactiveRole in author.roles and any([badword in contentLower for badword in config['wordBlacklist']]):
             blacklistCount = 0
-            
+
             words = contentLower.split()
             for i in range(len(words)):
                 word = words[i]
@@ -192,7 +202,7 @@ async def on_message(msg: discord.Message):
                             raise XlistedWord()
                 except XlistedWord:
                     continue
-            
+
             if blacklistCount > 0:
                 # Warn the author of their infraction
                 await msg.channel.send("{}\n{}".format(
@@ -209,29 +219,28 @@ async def on_message(msg: discord.Message):
                     datetime.now(), msg.channel.name, author.display_name, content
                 ))
         # End topic monitoring
-        
-        
+
         # CAS-abuse monitoring
         try:
             highestCAS = None
             highestCASPos = 0
-            
+
             # Alert if clearance less than Ultraviolet directly mentions the Computer
             # (assumes there's no extra roles in the server hierarchy between UV and the Computer's role)
             if Computer in msg.mentions and authorClearance.position < ComputerRole.position - 1:
                 highestCAS = Computer.display_name
                 raise CASViolation()
-                
+
             # Find the highest mentioned clearance level
             for mention in msg.role_mentions:
                 if mention.position > highestCASPos:
                     highestCAS = mention
                     highestCASPos = mention.position
-                    
+
             # Alert if the mentioned clearance was more than 1 level above the author's
             if highestCAS != None and highestCASPos > authorClearance.position + 1:
                 raise CASViolation()
-            
+
         except CASViolation:
             # Warn the author of their infraction
             await msg.channel.send("{}\n{}".format(
@@ -242,23 +251,25 @@ async def on_message(msg: discord.Message):
                 ComputerRole.mention, datetime.now(), msg.channel.name, author.display_name, authorClearance, highestCAS
             ))
         # End CAS-abuse monitoring
-        
+
 
 def run_client(client, token):
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run(token))
-    
+
+
 async def shutdown():
     await client.close()
     await sys.exit()
-    
+
+
 async def updateLinks():
     oldCitizenLinks = server.text_channels
-    citizens = server.members
+    citizens = list(server.members)
 
     # Sort alphabetically by display name
     citizens.sort(key=lambda x: x.display_name)
-    
+
     DMCategory = None
     privateCategory = None
     for category in server.categories:
@@ -266,28 +277,29 @@ async def updateLinks():
             DMCategory = category
         elif category.name == config['privateChannels']:
             privateCategory = category
-    
+
     # Delete old channels
     for link in oldCitizenLinks:
         if link.category == DMCategory or link.category == privateCategory:
             await link.delete()
-    
+
     # Create public shared channel
     PublicPermissions = {
         server.default_role: discord.PermissionOverwrite(read_messages=True),
-        server.me: discord.PermissionOverwrite(read_messages=True)
+        server.me: discord.PermissionOverwrite(read_messages=True),
+        InactiveRole: discord.PermissionOverwrite(read_messages=False)
     }
     await server.create_text_channel('computer-all', overwrites=PublicPermissions, category=DMCategory)
-    
+
     # Create private channel for each citizen-citizen and citizen-Computer pair
     for i in range(len(citizens)):
-        if citizens[i].bot or ComputerRole in citizens[i].roles:
+        if citizens[i].bot or ComputerRole in citizens[i].roles or InactiveRole in citizens[i].roles:
             continue
-        
+
         for j in range(i+1, len(citizens)):
-            if citizens[j].bot or ComputerRole in citizens[j].roles:
+            if citizens[j].bot or ComputerRole in citizens[j].roles or InactiveRole in citizens[j].roles:
                 continue
-            
+
             privatePermissions = {
                 server.default_role: discord.PermissionOverwrite(read_messages=False),
                 citizens[i]: discord.PermissionOverwrite(read_messages=True),
@@ -295,15 +307,16 @@ async def updateLinks():
                 server.me: discord.PermissionOverwrite(read_messages=True)
             }
             await server.create_text_channel(citizens[i].display_name+'-'+citizens[j].display_name, overwrites=privatePermissions, category=privateCategory)
-            
+
         DMPermissions = {
             server.default_role: discord.PermissionOverwrite(read_messages=False),
             citizens[i]: discord.PermissionOverwrite(read_messages=True),
             server.me: discord.PermissionOverwrite(read_messages=True)
         }
         await server.create_text_channel('computer-'+citizens[i].display_name, overwrites=DMPermissions, category=DMCategory)
-        
-    return
+
+    await shutdown() # reboot since PA channel will have changed
+
 
 if __name__ == '__main__':
     try:
